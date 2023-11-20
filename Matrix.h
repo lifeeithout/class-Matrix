@@ -13,6 +13,10 @@
 
 #include <vector>
 
+#include <fstream>
+
+#include <cstdlib>
+
 template <class Type>
 class Matrix
 {
@@ -22,6 +26,7 @@ class Matrix
 	friend std::ostream& operator << (std::ostream&, const Matrix<Type>&);
 public:
 	Matrix() = default;
+	Matrix(const char*);
 	Matrix(const Matrix<Type>&);
 	Matrix(std::initializer_list<Type>);
 	Matrix(std::initializer_list<std::initializer_list<Type>>);
@@ -36,12 +41,15 @@ public:
 	bool isSquare() const noexcept { return row == col; }
 	bool isDiagonal() const noexcept;
 	bool isSymmetric() const noexcept;
+	void exportInFile(const char*) const;
 	void swap(Matrix<Type>&) noexcept;
 	void clear() noexcept { helperDestructor(); }
 	void transpose() noexcept;
 	void fill(const Type&) noexcept;
 	void deleteRow(const size_t&);
 	void deleteCol(const size_t&);
+	void swapRows(const size_t&, const size_t&);
+	void swapCols(const size_t&, const size_t&);
 	Type summa() const noexcept;
 	Type maxElement() const noexcept;
 	Type minElement() const noexcept;
@@ -77,7 +85,43 @@ private:
 	void helperConstructor(const size_t&, const size_t&);
 	void helperDestructor();
 	void helperCrement(const bool&);
+	bool examinationOfFile(const char*);
 };
+
+template <class Type>
+inline Matrix<Type>::Matrix(const char* fileName)
+{
+	std::ifstream objectFile(fileName, std::ios::in);
+	if (!objectFile) 
+	{
+		std::cerr << "Файл " << fileName << " не может быть открыт\n";
+		exit(EXIT_FAILURE);
+	}
+
+	objectFile.close();
+
+	if (!examinationOfFile(fileName)) 
+	{
+		std::cerr << "Содержимое файла некорректно\n";
+		exit(EXIT_FAILURE);
+	}
+
+	objectFile.open(fileName, std::ios::in);
+
+	objectFile >> row >> col;
+
+	helperConstructor(row, col);
+
+	for (size_t i = 0; i < row; ++i)
+	{
+		for (size_t j = 0; j < col; ++j)
+		{
+			objectFile >> matrixPtr[i][j];
+		}
+	}
+
+	objectFile.close();
+}
 
 template <class Type>
 inline Matrix<Type>::Matrix(const Matrix<Type>& other)
@@ -225,6 +269,28 @@ inline bool Matrix<Type>::isSymmetric() const noexcept
 }
 
 template <class Type>
+inline void Matrix<Type>::exportInFile(const char* fileName) const
+{
+	std::ofstream output(fileName, std::ios::out);
+	if (!output)
+	{
+		throw std::invalid_argument("Не удалось открыть файл для записи!");
+	}
+
+	output << this->row << ' ' << this->col << ' ';
+
+	for (size_t i = 0; i < row; ++i)
+	{
+		for (size_t j = 0; j < col; ++j)
+		{
+			output << this->matrixPtr[i][j] << ' ';
+		}
+	}
+
+	output.close();
+}
+
+template <class Type>
 inline void Matrix<Type>::swap(Matrix<Type>& other) noexcept
 {
 	std::swap(matrixPtr, other.matrixPtr);
@@ -324,6 +390,44 @@ inline void Matrix<Type>::deleteCol(const size_t& numOfCol)
 	}
 
 	*this = newMatrix;
+}
+
+template <class Type>
+inline void Matrix<Type>::swapRows(const size_t& firstIndex, const size_t& secondIndex)
+{
+	if (firstIndex < 1 or secondIndex < 1 or firstIndex > row or secondIndex > row)
+	{
+		throw std::out_of_range("Обращение к несуществующей строке!");
+	}
+
+	if (firstIndex == secondIndex)
+	{
+		return;
+	}
+
+	for (size_t i = 0; i < col; ++i)
+	{
+		std::swap(matrixPtr[firstIndex - 1][i], matrixPtr[secondIndex - 1][i]);
+	}
+}
+
+template <class Type>
+inline void Matrix<Type>::swapCols(const size_t& firstIndex, const size_t& secondIndex)
+{
+	if (firstIndex < 1 or secondIndex < 1 or firstIndex > col or secondIndex > col)
+	{
+		throw std::out_of_range("Обращение к несуществующему столбцу!");
+	}
+
+	if (firstIndex == secondIndex)
+	{
+		return;
+	}
+
+	for (size_t i = 0; i < row; ++i)
+	{
+		std::swap(matrixPtr[i][firstIndex - 1], matrixPtr[i][secondIndex - 1]);
+	}
 }
 
 template <class Type>
@@ -737,6 +841,57 @@ inline void Matrix<Type>::helperCrement(const bool& is)
 			help(matrixPtr[i][j], is);
 		}
 	}
+}
+
+template <class Type>
+bool Matrix<Type>::examinationOfFile(const char* file)
+{
+
+	std::ifstream examFile(file, std::ios::in);
+
+	int examRow, examCol;
+
+	examFile >> examRow >> examCol;
+
+	if (examRow <= 0 or examCol <= 0) 
+	{
+		// Некорректные размеры матрицы
+		return false;
+	}
+
+	if (examFile.fail()) 
+	{
+		// Ошибка при чтении размеров матрицы
+		return false;
+	}
+
+	for (size_t i = 0; i < examRow; ++i) 
+	{
+		for (size_t j = 0; j < examCol; ++j) 
+		{
+			Type value;
+
+			examFile >> value;
+
+			if (examFile.fail())
+			{
+				// Ошибка при чтении элемента матрицы
+				return false;
+			}
+		}
+	}
+
+	char nextChar;
+
+	if (examFile >> nextChar) 
+	{
+		// Символы после матрицы
+		return false;
+	}
+
+	examFile.close();
+
+	return true;
 }
 
 template <typename MatrixType>
